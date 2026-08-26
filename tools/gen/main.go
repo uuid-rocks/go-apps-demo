@@ -21,42 +21,65 @@ import (
 )
 
 type dep struct {
-	path, version string
-	// imports is the import path used in main.go; usage is a code snippet
-	// that references the package so the import is not unused.
-	imports string
-	usage   string
+	path     string
+	versions []string // one is picked per app, so different seeds pull different versions
+	imports  string   // import path used in main.go
+	alias    string   // optional import alias (avoids package-name collisions)
+	usage    string   // snippet referencing the package so the import is used
 }
 
-// A pool of real, commonly used modules with pinned versions. Each app picks
-// a seeded subset so the module cache gets a mix of overlapping and unique
-// downloads across apps.
+// A pool of real modules with several pinned versions each. Each app picks a
+// seeded subset and a seeded version of each, so the module cache sees both
+// overlap and lots of unique downloads across apps and across seeds. The
+// "heavy" entries at the bottom pull in very large dependency trees.
 var depPool = []dep{
-	{"github.com/google/uuid", "v1.6.0", "github.com/google/uuid", `_ = uuid.New().String()`},
-	{"go.uber.org/zap", "v1.27.0", "go.uber.org/zap", `l, _ := zap.NewProduction(); defer l.Sync(); l.Info("boot")`},
-	{"github.com/spf13/cobra", "v1.8.1", "github.com/spf13/cobra", `_ = &cobra.Command{Use: "app"}`},
-	{"github.com/spf13/pflag", "v1.0.5", "github.com/spf13/pflag", `_ = pflag.NewFlagSet("app", pflag.ContinueOnError)`},
-	{"github.com/gin-gonic/gin", "v1.10.0", "github.com/gin-gonic/gin", `_ = gin.New()`},
-	{"github.com/gorilla/mux", "v1.8.1", "github.com/gorilla/mux", `_ = mux.NewRouter()`},
-	{"github.com/go-chi/chi/v5", "v5.1.0", "github.com/go-chi/chi/v5", `_ = chi.NewRouter()`},
-	{"golang.org/x/sync", "v0.10.0", "golang.org/x/sync/errgroup", `var g errgroup.Group; _ = g.Wait()`},
-	{"golang.org/x/text", "v0.21.0", "golang.org/x/text/cases", `_ = cases.Title`},
-	{"gopkg.in/yaml.v3", "v3.0.1", "gopkg.in/yaml.v3", `_, _ = yaml.Marshal(map[string]int{"a": 1})`},
-	{"github.com/pelletier/go-toml/v2", "v2.2.3", "github.com/pelletier/go-toml/v2", `_, _ = toml.Marshal(map[string]int{"a": 1})`},
-	{"github.com/stretchr/testify", "v1.10.0", "github.com/stretchr/testify/assert", `_ = assert.Equal`},
-	{"github.com/prometheus/client_golang", "v1.20.5", "github.com/prometheus/client_golang/prometheus", `_ = prometheus.NewCounter(prometheus.CounterOpts{Name: "x"})`},
-	{"github.com/rs/zerolog", "v1.33.0", "github.com/rs/zerolog", `_ = zerolog.New(os.Stdout)`},
-	{"github.com/sirupsen/logrus", "v1.9.3", "github.com/sirupsen/logrus", `logrus.SetLevel(logrus.InfoLevel)`},
-	{"github.com/jackc/pgx/v5", "v5.7.1", "github.com/jackc/pgx/v5/pgtype", `_ = pgtype.Text{}`},
-	{"github.com/redis/go-redis/v9", "v9.7.0", "github.com/redis/go-redis/v9", `_ = redis.NewClient(&redis.Options{})`},
-	{"github.com/aws/aws-sdk-go-v2", "v1.32.6", "github.com/aws/aws-sdk-go-v2/aws", `_ = aws.String("x")`},
-	{"google.golang.org/protobuf", "v1.36.0", "google.golang.org/protobuf/proto", `_ = proto.Marshal`},
-	{"google.golang.org/grpc", "v1.69.2", "google.golang.org/grpc", `_ = grpc.NewServer()`},
-	{"github.com/hashicorp/go-multierror", "v1.1.1", "github.com/hashicorp/go-multierror", `_ = multierror.Append(nil, nil)`},
-	{"github.com/cespare/xxhash/v2", "v2.3.0", "github.com/cespare/xxhash/v2", `_ = xxhash.Sum64String("x")`},
-	{"github.com/mitchellh/mapstructure", "v1.5.0", "github.com/mitchellh/mapstructure", `_ = mapstructure.Decode`},
-	{"github.com/json-iterator/go", "v1.1.12", "github.com/json-iterator/go", `_ = jsoniter.ConfigFastest`},
-	{"github.com/klauspost/compress", "v1.17.11", "github.com/klauspost/compress/zstd", `_, _ = zstd.NewWriter(nil)`},
+	{"github.com/google/uuid", []string{"v1.3.1", "v1.4.0", "v1.5.0", "v1.6.0"}, "github.com/google/uuid", "", `_ = uuid.New().String()`},
+	{"go.uber.org/zap", []string{"v1.24.0", "v1.25.0", "v1.26.0", "v1.27.0"}, "go.uber.org/zap", "", `l, _ := zap.NewProduction(); defer l.Sync(); l.Info("boot")`},
+	{"github.com/spf13/cobra", []string{"v1.6.1", "v1.7.0", "v1.8.0", "v1.8.1"}, "github.com/spf13/cobra", "", `_ = &cobra.Command{Use: "app"}`},
+	{"github.com/spf13/viper", []string{"v1.17.0", "v1.18.2", "v1.19.0"}, "github.com/spf13/viper", "", `_ = viper.New()`},
+	{"github.com/urfave/cli/v2", []string{"v2.25.7", "v2.27.1", "v2.27.5"}, "github.com/urfave/cli/v2", "", `_ = &cli.App{}`},
+	{"github.com/gin-gonic/gin", []string{"v1.9.0", "v1.9.1", "v1.10.0"}, "github.com/gin-gonic/gin", "", `_ = gin.New()`},
+	{"github.com/gorilla/mux", []string{"v1.8.0", "v1.8.1"}, "github.com/gorilla/mux", "", `_ = mux.NewRouter()`},
+	{"github.com/go-chi/chi/v5", []string{"v5.0.10", "v5.0.12", "v5.1.0"}, "github.com/go-chi/chi/v5", "", `_ = chi.NewRouter()`},
+	{"github.com/labstack/echo/v4", []string{"v4.11.4", "v4.12.0"}, "github.com/labstack/echo/v4", "", `_ = echo.New()`},
+	{"github.com/gofiber/fiber/v2", []string{"v2.51.0", "v2.52.5"}, "github.com/gofiber/fiber/v2", "", `_ = fiber.New()`},
+	{"golang.org/x/sync", []string{"v0.5.0", "v0.6.0", "v0.7.0", "v0.8.0", "v0.10.0"}, "golang.org/x/sync/errgroup", "", `var g errgroup.Group; _ = g.Wait()`},
+	{"golang.org/x/text", []string{"v0.14.0", "v0.16.0", "v0.18.0", "v0.21.0"}, "golang.org/x/text/cases", "", `_ = cases.Title`},
+	{"golang.org/x/crypto", []string{"v0.17.0", "v0.21.0", "v0.28.0", "v0.31.0"}, "golang.org/x/crypto/bcrypt", "", `_ = bcrypt.DefaultCost`},
+	{"golang.org/x/net", []string{"v0.19.0", "v0.23.0", "v0.28.0", "v0.33.0"}, "golang.org/x/net/html", "", `_ = html.EscapeString`},
+	{"gopkg.in/yaml.v3", []string{"v3.0.1"}, "gopkg.in/yaml.v3", "", `_, _ = yaml.Marshal(map[string]int{"a": 1})`},
+	{"github.com/pelletier/go-toml/v2", []string{"v2.1.1", "v2.2.3"}, "github.com/pelletier/go-toml/v2", "", `_, _ = toml.Marshal(map[string]int{"a": 1})`},
+	{"github.com/stretchr/testify", []string{"v1.8.4", "v1.9.0", "v1.10.0"}, "github.com/stretchr/testify/assert", "", `_ = assert.Equal`},
+	{"github.com/prometheus/client_golang", []string{"v1.17.0", "v1.18.0", "v1.19.1", "v1.20.5"}, "github.com/prometheus/client_golang/prometheus", "", `_ = prometheus.NewCounter(prometheus.CounterOpts{Name: "x"})`},
+	{"go.opentelemetry.io/otel", []string{"v1.21.0", "v1.24.0", "v1.28.0", "v1.32.0"}, "go.opentelemetry.io/otel", "", `_ = otel.Tracer("x")`},
+	{"github.com/rs/zerolog", []string{"v1.31.0", "v1.32.0", "v1.33.0"}, "github.com/rs/zerolog", "", `_ = zerolog.New(os.Stdout)`},
+	{"github.com/sirupsen/logrus", []string{"v1.9.3"}, "github.com/sirupsen/logrus", "", `logrus.SetLevel(logrus.InfoLevel)`},
+	{"github.com/jackc/pgx/v5", []string{"v5.5.0", "v5.6.0", "v5.7.1"}, "github.com/jackc/pgx/v5/pgtype", "", `_ = pgtype.Text{}`},
+	{"github.com/jmoiron/sqlx", []string{"v1.3.5", "v1.4.0"}, "github.com/jmoiron/sqlx", "", `_ = sqlx.Open`},
+	{"gorm.io/gorm", []string{"v1.25.5", "v1.25.12"}, "gorm.io/gorm", "", `_ = &gorm.Config{}`},
+	{"github.com/redis/go-redis/v9", []string{"v9.3.1", "v9.5.1", "v9.7.0"}, "github.com/redis/go-redis/v9", "", `_ = redis.NewClient(&redis.Options{})`},
+	{"github.com/nats-io/nats.go", []string{"v1.31.0", "v1.34.1", "v1.37.0"}, "github.com/nats-io/nats.go", "", `_ = nats.DefaultURL`},
+	{"github.com/segmentio/kafka-go", []string{"v0.4.45", "v0.4.47"}, "github.com/segmentio/kafka-go", "", `_ = kafka.Message{}`},
+	{"github.com/elastic/go-elasticsearch/v8", []string{"v8.11.1", "v8.15.0"}, "github.com/elastic/go-elasticsearch/v8", "", `_ = elasticsearch.NewDefaultClient`},
+	{"google.golang.org/protobuf", []string{"v1.32.0", "v1.33.0", "v1.34.2", "v1.36.0"}, "google.golang.org/protobuf/proto", "", `_ = proto.Marshal`},
+	{"google.golang.org/grpc", []string{"v1.60.1", "v1.62.1", "v1.65.0", "v1.69.2"}, "google.golang.org/grpc", "", `_ = grpc.NewServer()`},
+	{"github.com/grpc-ecosystem/grpc-gateway/v2", []string{"v2.19.0", "v2.22.0", "v2.24.0"}, "github.com/grpc-ecosystem/grpc-gateway/v2/runtime", "gwruntime", `_ = gwruntime.NewServeMux()`},
+	{"github.com/golang-jwt/jwt/v5", []string{"v5.2.0", "v5.2.1"}, "github.com/golang-jwt/jwt/v5", "", `_ = jwt.New(jwt.SigningMethodHS256)`},
+	{"github.com/go-playground/validator/v10", []string{"v10.16.0", "v10.19.0", "v10.23.0"}, "github.com/go-playground/validator/v10", "", `_ = validator.New()`},
+	{"github.com/hashicorp/go-multierror", []string{"v1.1.1"}, "github.com/hashicorp/go-multierror", "", `_ = multierror.Append(nil, nil)`},
+	{"github.com/cespare/xxhash/v2", []string{"v2.2.0", "v2.3.0"}, "github.com/cespare/xxhash/v2", "", `_ = xxhash.Sum64String("x")`},
+	{"github.com/mitchellh/mapstructure", []string{"v1.5.0"}, "github.com/mitchellh/mapstructure", "", `_ = mapstructure.Decode`},
+	{"github.com/json-iterator/go", []string{"v1.1.12"}, "github.com/json-iterator/go", "", `_ = jsoniter.ConfigFastest`},
+	{"github.com/klauspost/compress", []string{"v1.17.4", "v1.17.9", "v1.17.11"}, "github.com/klauspost/compress/zstd", "", `_, _ = zstd.NewWriter(nil)`},
+	// Heavy: huge module downloads and/or large compile trees.
+	{"github.com/aws/aws-sdk-go", []string{"v1.48.0", "v1.50.0", "v1.55.5"}, "github.com/aws/aws-sdk-go/aws", "awsv1", `_ = awsv1.String("x")`},
+	{"github.com/aws/aws-sdk-go-v2", []string{"v1.24.0", "v1.27.0", "v1.30.0", "v1.32.6"}, "github.com/aws/aws-sdk-go-v2/aws", "", `_ = aws.String("x")`},
+	{"github.com/aws/aws-sdk-go-v2/service/s3", []string{"v1.48.0", "v1.55.0", "v1.60.0", "v1.70.0"}, "github.com/aws/aws-sdk-go-v2/service/s3", "", `_ = s3.NewFromConfig`},
+	{"github.com/aws/aws-sdk-go-v2/service/dynamodb", []string{"v1.27.0", "v1.32.0", "v1.36.0"}, "github.com/aws/aws-sdk-go-v2/service/dynamodb", "", `_ = dynamodb.NewFromConfig`},
+	{"cloud.google.com/go/storage", []string{"v1.36.0", "v1.40.0", "v1.43.0"}, "cloud.google.com/go/storage", "gcs", `_ = gcs.NewClient`},
+	{"k8s.io/client-go", []string{"v0.29.0", "v0.30.0", "v0.31.0"}, "k8s.io/client-go/kubernetes", "", `_ = kubernetes.NewForConfigOrDie`},
+	{"github.com/docker/docker", []string{"v25.0.3+incompatible", "v26.1.0+incompatible", "v27.3.1+incompatible"}, "github.com/docker/docker/client", "dockerclient", `_ = dockerclient.NewClientWithOpts`},
+	{"github.com/hashicorp/terraform-plugin-sdk/v2", []string{"v2.30.0", "v2.34.0"}, "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema", "tfschema", `_ = &tfschema.Resource{}`},
 }
 
 func main() {
@@ -64,9 +87,9 @@ func main() {
 	seed := flag.Int64("seed", 1, "random seed (change to simulate a new round of PRs)")
 	out := flag.String("out", "apps", "output directory")
 	tidy := flag.Bool("tidy", true, "run 'go mod tidy' in each generated app (needs network)")
-	pkgsPer := flag.Int("pkgs", 4, "internal packages per app")
-	filesPer := flag.Int("files", 3, "files per internal package")
-	funcsPer := flag.Int("funcs", 25, "functions per file")
+	pkgsPer := flag.Int("pkgs", 12, "internal packages per app")
+	filesPer := flag.Int("files", 6, "files per internal package")
+	funcsPer := flag.Int("funcs", 40, "functions per file")
 	only := flag.Int("only", -1, "generate only app with this index (0-based); output is identical to a full run")
 	flag.Parse()
 
@@ -107,17 +130,19 @@ func genApp(dir, name string, rng *rand.Rand, pkgs, files, funcs int) error {
 	}
 	modPath := "example.com/" + name
 
-	// Pick 2..7 deps.
+	// Pick 5..12 deps, each at a seeded version.
 	perm := rng.Perm(len(depPool))
 	deps := make([]dep, 0)
-	for _, idx := range perm[:2+rng.Intn(6)] {
-		deps = append(deps, depPool[idx])
+	for _, idx := range perm[:5+rng.Intn(8)] {
+		d := depPool[idx]
+		d.versions = []string{d.versions[rng.Intn(len(d.versions))]}
+		deps = append(deps, d)
 	}
 
 	var gomod strings.Builder
 	fmt.Fprintf(&gomod, "module %s\n\ngo 1.24\n\nrequire (\n", modPath)
 	for _, d := range deps {
-		fmt.Fprintf(&gomod, "\t%s %s\n", d.path, d.version)
+		fmt.Fprintf(&gomod, "\t%s %s\n", d.path, d.versions[0])
 	}
 	gomod.WriteString(")\n")
 	if err := write(filepath.Join(dir, "go.mod"), gomod.String()); err != nil {
@@ -150,7 +175,11 @@ func genApp(dir, name string, rng *rand.Rand, pkgs, files, funcs int) error {
 		fmt.Fprintf(&m, "\t\"%s/internal/%s\"\n", modPath, p)
 	}
 	for _, d := range deps {
-		fmt.Fprintf(&m, "\t\"%s\"\n", d.imports)
+		if d.alias != "" {
+			fmt.Fprintf(&m, "\t%s \"%s\"\n", d.alias, d.imports)
+		} else {
+			fmt.Fprintf(&m, "\t\"%s\"\n", d.imports)
+		}
 	}
 	m.WriteString(")\n\nfunc main() {\n\t_ = os.Args\n")
 	for _, d := range deps {
