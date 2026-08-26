@@ -10,13 +10,35 @@ on:
         description: Generator seed (defaults to run number; change to simulate new PR churn)
         required: false
       count:
-        description: Number of apps to generate
+        description: Number of apps to build (max 256)
         required: false
         default: "100"
 
 jobs:
+  plan:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      indices: ${{ steps.plan.outputs.indices }}
+      seed: ${{ steps.plan.outputs.seed }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - id: plan
+        run: |
+          COUNT="${{ inputs.count || '100' }}"
+          SEED="${{ inputs.seed || github.run_number }}"
+          echo "indices=$(seq -s, 0 $((COUNT - 1)) | sed 's/.*/[&]/')" >> "$GITHUB_OUTPUT"
+          echo "seed=$SEED" >> "$GITHUB_OUTPUT"
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: plan
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    strategy:
+      max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
+      fail-fast: false
+      matrix:
+        index: ${{ fromJson(needs.plan.outputs.indices) }}
+    name: app-${{ matrix.index }}
     env:
       GOCACHE: /mnt/go-cache/build
       GOMODCACHE: /mnt/go-cache/mod
@@ -33,12 +55,10 @@ jobs:
           go-version-file: go.mod
           cache: false # sticky disk handles caching
 
-      - name: Generate apps
+      - name: Generate app
         run: |
-          SEED="${{ inputs.seed || github.run_number }}"
-          COUNT="${{ inputs.count || '100' }}"
-          echo "seed=$SEED count=$COUNT"
-          go run ./tools/gen -n "$COUNT" -seed "$SEED" -out apps
+          go run ./tools/gen -n "${{ needs.plan.outputs.count }}" -seed "${{ needs.plan.outputs.seed }}" \
+            -only "${{ matrix.index }}" -out apps
 
-      - name: Build all apps in series
+      - name: Build app
         run: ./scripts/build-all.sh

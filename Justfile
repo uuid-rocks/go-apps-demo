@@ -28,3 +28,7 @@ clean:
 # Lint the generator itself
 check:
     gofmt -l tools && go vet ./tools/...
+
+# Generate a single app by index (what each CI matrix job does)
+gen-one index n=n seed=seed:
+    go run ./tools/gen -n {{n}} -seed {{seed}} -only {{index}} -out apps

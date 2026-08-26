@@ -8,8 +8,9 @@ simulates many developers opening PRs against many Go services.
   Changing `-seed` changes every app's source, simulating a new round of PRs.
 - `scripts/build-all.sh` — builds/vets/tests every app in series with timing and
   `GOCACHE`/`GOMODCACHE` size reporting.
-- `.github/workflows/build.yml` — mounts a sticky disk at `/mnt/go-cache`, generates
-  apps with seed = run number, and builds them all.
+- `.github/workflows/build.yml` — a `plan` job emits app indices; a `build` matrix job
+  (`max-parallel: 1`) runs one job per app in series, each mounting the sticky disk at
+  `/mnt/go-cache`, generating only its app (`-only N`, seed = run number), and building it.
 
 Local:
 

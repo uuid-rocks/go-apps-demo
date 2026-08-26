@@ -67,6 +67,7 @@ func main() {
 	pkgsPer := flag.Int("pkgs", 4, "internal packages per app")
 	filesPer := flag.Int("files", 3, "files per internal package")
 	funcsPer := flag.Int("funcs", 25, "functions per file")
+	only := flag.Int("only", -1, "generate only app with this index (0-based); output is identical to a full run")
 	flag.Parse()
 
 	if err := os.MkdirAll(*out, 0o755); err != nil {
@@ -79,6 +80,9 @@ func main() {
 		// Per-app RNG derived from the global one so app K is stable for a
 		// given seed regardless of -n.
 		appRng := rand.New(rand.NewSource(rng.Int63()))
+		if *only >= 0 && i != *only {
+			continue
+		}
 		if err := genApp(dir, name, appRng, *pkgsPer, *filesPer, *funcsPer); err != nil {
 			log.Fatalf("%s: %v", name, err)
 		}
