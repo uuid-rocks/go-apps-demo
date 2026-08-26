@@ -1,0 +1,2 @@
+# Generated apps (regenerate with: go run ./tools/gen)
+/apps/

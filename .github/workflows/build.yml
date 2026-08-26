@@ -1,0 +1,44 @@
+name: build-all
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Generator seed (defaults to run number; change to simulate new PR churn)
+        required: false
+      count:
+        description: Number of apps to generate
+        required: false
+        default: "100"
+
+jobs:
+  build:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      GOCACHE: /mnt/go-cache/build
+      GOMODCACHE: /mnt/go-cache/mod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-go-cache
+          path: /mnt/go-cache
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false # sticky disk handles caching
+
+      - name: Generate apps
+        run: |
+          SEED="${{ inputs.seed || github.run_number }}"
+          COUNT="${{ inputs.count || '100' }}"
+          echo "seed=$SEED count=$COUNT"
+          go run ./tools/gen -n "$COUNT" -seed "$SEED" -out apps
+
+      - name: Build all apps in series
+        run: ./scripts/build-all.sh
