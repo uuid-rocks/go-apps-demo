@@ -78,7 +78,8 @@ var depPool = []dep{
 	{"github.com/aws/aws-sdk-go-v2/service/dynamodb", []string{"v1.27.0", "v1.32.0", "v1.36.0"}, "github.com/aws/aws-sdk-go-v2/service/dynamodb", "", `_ = dynamodb.NewFromConfig`},
 	{"cloud.google.com/go/storage", []string{"v1.36.0", "v1.40.0", "v1.43.0"}, "cloud.google.com/go/storage", "gcs", `_ = gcs.NewClient`},
 	{"k8s.io/client-go", []string{"v0.29.0", "v0.30.0", "v0.31.0"}, "k8s.io/client-go/kubernetes", "", `_ = kubernetes.NewForConfigOrDie`},
-	{"github.com/docker/docker", []string{"v25.0.3+incompatible", "v26.1.0+incompatible", "v27.3.1+incompatible"}, "github.com/docker/docker/client", "dockerclient", `_ = dockerclient.NewClientWithOpts`},
+	{"github.com/aws/aws-sdk-go-v2/service/ec2", []string{"v1.140.0", "v1.160.0", "v1.190.0"}, "github.com/aws/aws-sdk-go-v2/service/ec2", "", `_ = ec2.NewFromConfig`},
+	{"github.com/minio/minio-go/v7", []string{"v7.0.63", "v7.0.70", "v7.0.80"}, "github.com/minio/minio-go/v7", "minio", `_ = minio.New`},
 	{"github.com/hashicorp/terraform-plugin-sdk/v2", []string{"v2.30.0", "v2.34.0"}, "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema", "tfschema", `_ = &tfschema.Resource{}`},
 }
 
