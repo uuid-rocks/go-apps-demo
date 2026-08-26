@@ -19,12 +19,18 @@ jobs:
   plan:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     outputs:
-      indices: ${{ steps.plan.outputs.indices }}
+      batch0: ${{ steps.plan.outputs.batch0 }}
+      batch1: ${{ steps.plan.outputs.batch1 }}
+      batch2: ${{ steps.plan.outputs.batch2 }}
+      batch3: ${{ steps.plan.outputs.batch3 }}
       seed: ${{ steps.plan.outputs.seed }}
     steps:
       - id: plan
         run: |
-          echo "indices=$(seq -s, 0 $((PER_BATCH - 1)) | sed 's/.*/[&]/')" >> "$GITHUB_OUTPUT"
+          for b in 0 1 2 3; do
+            start=$((b * PER_BATCH)); end=$((start + PER_BATCH - 1))
+            echo "batch$b=$(seq -s, $start $end | sed 's/.*/[&]/')" >> "$GITHUB_OUTPUT"
+          done
           echo "seed=${{ inputs.seed || github.run_number }}" >> "$GITHUB_OUTPUT"
 
   build-0:
@@ -35,12 +41,12 @@ jobs:
       max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
       fail-fast: false
       matrix:
-        index: ${{ fromJson(needs.plan.outputs.indices) }}
-    name: app-${{ 0 * 256 + matrix.index }}
+        index: ${{ fromJson(needs.plan.outputs.batch0) }}
+    name: app-${{ matrix.index }}
     env:
       GOCACHE: /mnt/go-cache/build
       GOMODCACHE: /mnt/go-cache/mod
-      APP_INDEX: ${{ 0 * 256 + matrix.index }}
+      APP_INDEX: ${{ matrix.index }}
     steps:
       - uses: actions/checkout@v4
 
@@ -68,12 +74,12 @@ jobs:
       max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
       fail-fast: false
       matrix:
-        index: ${{ fromJson(needs.plan.outputs.indices) }}
-    name: app-${{ 1 * 256 + matrix.index }}
+        index: ${{ fromJson(needs.plan.outputs.batch1) }}
+    name: app-${{ matrix.index }}
     env:
       GOCACHE: /mnt/go-cache/build
       GOMODCACHE: /mnt/go-cache/mod
-      APP_INDEX: ${{ 1 * 256 + matrix.index }}
+      APP_INDEX: ${{ matrix.index }}
     steps:
       - uses: actions/checkout@v4
 
@@ -101,12 +107,12 @@ jobs:
       max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
       fail-fast: false
       matrix:
-        index: ${{ fromJson(needs.plan.outputs.indices) }}
-    name: app-${{ 2 * 256 + matrix.index }}
+        index: ${{ fromJson(needs.plan.outputs.batch2) }}
+    name: app-${{ matrix.index }}
     env:
       GOCACHE: /mnt/go-cache/build
       GOMODCACHE: /mnt/go-cache/mod
-      APP_INDEX: ${{ 2 * 256 + matrix.index }}
+      APP_INDEX: ${{ matrix.index }}
     steps:
       - uses: actions/checkout@v4
 
@@ -134,12 +140,12 @@ jobs:
       max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
       fail-fast: false
       matrix:
-        index: ${{ fromJson(needs.plan.outputs.indices) }}
-    name: app-${{ 3 * 256 + matrix.index }}
+        index: ${{ fromJson(needs.plan.outputs.batch3) }}
+    name: app-${{ matrix.index }}
     env:
       GOCACHE: /mnt/go-cache/build
       GOMODCACHE: /mnt/go-cache/mod
-      APP_INDEX: ${{ 3 * 256 + matrix.index }}
+      APP_INDEX: ${{ matrix.index }}
     steps:
       - uses: actions/checkout@v4
 
