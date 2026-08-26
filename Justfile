@@ -1,6 +1,6 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-n := "100"
+n := "1024"
 seed := "1"
 
 default:

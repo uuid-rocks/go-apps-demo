@@ -12,9 +12,10 @@ simulates many developers opening PRs against many Go services.
   Tune with `-pkgs`, `-files`, `-funcs`; `-only N` emits a single app.
 - `scripts/build-all.sh` — builds/vets/tests every app in series with timing and
   `GOCACHE`/`GOMODCACHE` size reporting.
-- `.github/workflows/build.yml` — a `plan` job emits app indices; a `build` matrix job
-  (`max-parallel: 1`) runs one job per app in series, each mounting the sticky disk at
-  `/mnt/go-cache`, generating only its app (`-only N`, seed = run number), and building it.
+- `.github/workflows/build.yml` — a `plan` job emits 256 matrix indices; four chained
+  jobs `build-0..3` (each a 256-item matrix with `max-parallel: 1`, the per-job cap)
+  run 1024 apps strictly in series. Each job mounts the sticky disk at `/mnt/go-cache`,
+  generates only its app (`-only N`, seed = run number), and builds it.
 
 Local:
 
