@@ -1,166 +1,43 @@
-name: build-all
+name: build
 
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
     inputs:
       seed:
-        description: Generator seed (defaults to run number; change to simulate new PR churn)
+        description: Generator seed (defaults to run number)
         required: false
-
-# 4 chained matrix jobs x 256 (the per-job matrix cap) = 1024 apps, all serial.
-env:
-  TOTAL: "1024"
-  PER_BATCH: "256"
+      count:
+        description: Number of apps to build in this run
+        required: false
+        default: "1"
 
 jobs:
-  plan:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
-    outputs:
-      batch0: ${{ steps.plan.outputs.batch0 }}
-      batch1: ${{ steps.plan.outputs.batch1 }}
-      batch2: ${{ steps.plan.outputs.batch2 }}
-      batch3: ${{ steps.plan.outputs.batch3 }}
-      seed: ${{ steps.plan.outputs.seed }}
+  build:
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    env:
+      GOCACHE: /mnt/go-cache/build
+      GOMODCACHE: /mnt/go-cache/mod
     steps:
-      - id: plan
+      - uses: actions/checkout@v4
+
+      - uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-go-cache
+          path: /mnt/go-cache
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false # sticky disk handles caching
+
+      - name: Generate app(s)
         run: |
-          for b in 0 1 2 3; do
-            start=$((b * PER_BATCH)); end=$((start + PER_BATCH - 1))
-            echo "batch$b=$(seq -s, $start $end | sed 's/.*/[&]/')" >> "$GITHUB_OUTPUT"
-          done
-          echo "seed=${{ inputs.seed || github.run_number }}" >> "$GITHUB_OUTPUT"
+          SEED="${{ inputs.seed || github.run_number }}"
+          COUNT="${{ inputs.count || '1' }}"
+          echo "seed=$SEED count=$COUNT"
+          go run ./tools/gen -n "$COUNT" -seed "$SEED" -out apps
 
-  build-0:
-    needs: [plan]
-    if: ${{ !cancelled() }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    strategy:
-      max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
-      fail-fast: false
-      matrix:
-        index: ${{ fromJson(needs.plan.outputs.batch0) }}
-    name: app-${{ matrix.index }}
-    env:
-      GOCACHE: /mnt/go-cache/build
-      GOMODCACHE: /mnt/go-cache/mod
-      APP_INDEX: ${{ matrix.index }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: useblacksmith/stickydisk@v1
-        with:
-          key: ${{ github.repository }}-go-cache
-          path: /mnt/go-cache
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false # sticky disk handles caching
-
-      - name: Generate app
-        run: go run ./tools/gen -n "$TOTAL" -seed "${{ needs.plan.outputs.seed }}" -only "$APP_INDEX" -out apps
-
-      - name: Build app
-        run: ./scripts/build-all.sh
-
-  build-1:
-    needs: [plan, build-0]
-    if: ${{ !cancelled() }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    strategy:
-      max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
-      fail-fast: false
-      matrix:
-        index: ${{ fromJson(needs.plan.outputs.batch1) }}
-    name: app-${{ matrix.index }}
-    env:
-      GOCACHE: /mnt/go-cache/build
-      GOMODCACHE: /mnt/go-cache/mod
-      APP_INDEX: ${{ matrix.index }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: useblacksmith/stickydisk@v1
-        with:
-          key: ${{ github.repository }}-go-cache
-          path: /mnt/go-cache
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false # sticky disk handles caching
-
-      - name: Generate app
-        run: go run ./tools/gen -n "$TOTAL" -seed "${{ needs.plan.outputs.seed }}" -only "$APP_INDEX" -out apps
-
-      - name: Build app
-        run: ./scripts/build-all.sh
-
-  build-2:
-    needs: [plan, build-1]
-    if: ${{ !cancelled() }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    strategy:
-      max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
-      fail-fast: false
-      matrix:
-        index: ${{ fromJson(needs.plan.outputs.batch2) }}
-    name: app-${{ matrix.index }}
-    env:
-      GOCACHE: /mnt/go-cache/build
-      GOMODCACHE: /mnt/go-cache/mod
-      APP_INDEX: ${{ matrix.index }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: useblacksmith/stickydisk@v1
-        with:
-          key: ${{ github.repository }}-go-cache
-          path: /mnt/go-cache
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false # sticky disk handles caching
-
-      - name: Generate app
-        run: go run ./tools/gen -n "$TOTAL" -seed "${{ needs.plan.outputs.seed }}" -only "$APP_INDEX" -out apps
-
-      - name: Build app
-        run: ./scripts/build-all.sh
-
-  build-3:
-    needs: [plan, build-2]
-    if: ${{ !cancelled() }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    strategy:
-      max-parallel: 1 # one build at a time, each in its own job / sticky-disk mount
-      fail-fast: false
-      matrix:
-        index: ${{ fromJson(needs.plan.outputs.batch3) }}
-    name: app-${{ matrix.index }}
-    env:
-      GOCACHE: /mnt/go-cache/build
-      GOMODCACHE: /mnt/go-cache/mod
-      APP_INDEX: ${{ matrix.index }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: useblacksmith/stickydisk@v1
-        with:
-          key: ${{ github.repository }}-go-cache
-          path: /mnt/go-cache
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false # sticky disk handles caching
-
-      - name: Generate app
-        run: go run ./tools/gen -n "$TOTAL" -seed "${{ needs.plan.outputs.seed }}" -only "$APP_INDEX" -out apps
-
-      - name: Build app
+      - name: Build
         run: ./scripts/build-all.sh
