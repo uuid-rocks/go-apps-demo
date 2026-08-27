@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Pushes a commit to main, waits for its workflow run to finish (via gh), then
-# immediately pushes the next one — COUNT times. Simulates back-to-back PRs
+# Pushes a commit to main, waits for its workflow run to finish (via gh), waits
+# DELAY seconds, then pushes the next one — COUNT times. Simulates back-to-back PRs
 # with no idle time between builds. Ctrl-C to stop early.
 #
 #   ./scripts/churn.sh [count]
 set -euo pipefail
 
 COUNT="${1:-${COUNT:-100}}"
+DELAY="${DELAY:-10}" # seconds to wait after a run finishes before pushing the next
 BRANCH="${BRANCH:-main}"
 WORKFLOW="${WORKFLOW:-build.yml}"
 
@@ -37,5 +38,6 @@ for ((i = 1; i <= COUNT; i++)); do
   start=$(date +%s)
   gh run watch "$run_id" --exit-status >/dev/null 2>&1 && status=success || status=failure
   echo "  run $run_id $status in $(( $(date +%s) - start ))s"
+  ((i < COUNT)) && sleep "$DELAY"
 done
 echo "done"
