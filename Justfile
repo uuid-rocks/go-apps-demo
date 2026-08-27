@@ -33,6 +33,6 @@ check:
 gen-one index n=n seed=seed:
     go run ./tools/gen -n {{n}} -seed {{seed}} -only {{index}} -out apps
 
-# Push `count` commits, one every `interval` seconds, to trigger CI runs
-churn count="100" interval="30":
-    ./scripts/churn.sh {{count}} {{interval}}
+# Push `count` commits back-to-back, waiting for each CI run to finish first
+churn count="100":
+    ./scripts/churn.sh {{count}}
