@@ -41,3 +41,8 @@ jobs:
 
       - name: Build
         run: ./scripts/build-all.sh
+
+      - name: Clean go cache if oversized
+        run: |
+          USED_GB=$(du -sBG "$(go env GOCACHE)" | cut -f1 | tr -d 'G')
+          if [ "$USED_GB" -gt 67 ]; then go clean -cache; fi
