@@ -17,7 +17,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 )
 
 type dep struct {
@@ -92,12 +94,15 @@ func main() {
 	filesPer := flag.Int("files", 6, "files per internal package")
 	funcsPer := flag.Int("funcs", 40, "functions per file")
 	only := flag.Int("only", -1, "generate only app with this index (0-based); output is identical to a full run")
+	jobs := flag.Int("j", runtime.NumCPU(), "parallel 'go mod tidy' workers")
 	flag.Parse()
 
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		log.Fatal(err)
 	}
 	rng := rand.New(rand.NewSource(*seed))
+	sem := make(chan struct{}, max(*jobs, 1))
+	var wg sync.WaitGroup
 	for i := 0; i < *n; i++ {
 		name := fmt.Sprintf("app-%03d", i)
 		dir := filepath.Join(*out, name)
@@ -107,19 +112,30 @@ func main() {
 		if *only >= 0 && i != *only {
 			continue
 		}
+		// Source generation is deterministic and cheap; do it inline.
 		if err := genApp(dir, name, appRng, *pkgsPer, *filesPer, *funcsPer); err != nil {
 			log.Fatalf("%s: %v", name, err)
 		}
-		if *tidy {
+		if !*tidy {
+			fmt.Printf("generated %s\n", dir)
+			continue
+		}
+		// go mod tidy is network-bound; run those concurrently.
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
 			cmd := exec.Command("go", "mod", "tidy")
 			cmd.Dir = dir
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 			if err := cmd.Run(); err != nil {
 				log.Fatalf("%s: go mod tidy: %v", name, err)
 			}
-		}
-		fmt.Printf("generated %s\n", dir)
+			fmt.Printf("generated %s\n", dir)
+		}()
 	}
+	wg.Wait()
 }
 
 func genApp(dir, name string, rng *rand.Rand, pkgs, files, funcs int) error {
