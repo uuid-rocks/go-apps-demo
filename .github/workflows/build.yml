@@ -42,7 +42,11 @@ jobs:
       - name: Build
         run: ./scripts/build-all.sh
 
-      - name: Clean go cache if oversized
+      - name: Clean go caches if oversized
         run: |
-          USED_GB=$(du -sBG "$(go env GOCACHE)" | cut -f1 | tr -d 'G')
-          if [ "$USED_GB" -gt 67 ]; then go clean -cache; fi
+          size_gb() { [ -d "$1" ] && du -sBG "$1" | cut -f1 | tr -d 'G' || echo 0; }
+          BUILD_GB=$(size_gb "$(go env GOCACHE)")
+          MOD_GB=$(size_gb "$(go env GOMODCACHE)")
+          echo "GOCACHE=${BUILD_GB}G GOMODCACHE=${MOD_GB}G"
+          if [ "$BUILD_GB" -gt 67 ]; then echo "GOCACHE over limit, wiping"; go clean -cache; fi
+          if [ "$MOD_GB" -gt 9 ]; then echo "GOMODCACHE over limit, wiping"; go clean -modcache; fi
