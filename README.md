@@ -14,8 +14,8 @@ simulates many developers opening PRs against many Go services.
   `GOCACHE`/`GOMODCACHE` size reporting.
 - `.github/workflows/build.yml` — one job per push: mounts the sticky disk at
   `/mnt/go-cache`, generates a fresh app (seed = run number), and builds it.
-- `scripts/churn.sh` / `just churn` — pushes a commit to `main` every 30s (`INTERVAL`)
-  so CI runs continuously, simulating a stream of PRs.
+- `scripts/churn.sh` / `just churn [count] [interval]` — pushes `count` commits (default
+  100) to `main`, one every `interval` seconds (default 30), simulating a stream of PRs.
 
 Local:
 
