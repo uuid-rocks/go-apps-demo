@@ -13,7 +13,7 @@ simulates many developers opening PRs against many Go services.
 - `scripts/build-all.sh` — builds/vets/tests every app in series with timing and
   `GOCACHE`/`GOMODCACHE` size reporting.
 - `.github/workflows/build.yml` — one job per push: mounts the sticky disk at
-  `/mnt/go-cache`, generates a fresh app (seed = run number), and builds it.
+  `/mnt/go-cache`, generates 100 fresh apps (seed = run number), and builds them in series.
 - `scripts/churn.sh` / `just churn [count]` — pushes a commit to `main`, waits (via
   `gh run watch`) for its run to finish, then pushes the next — `count` times (default
   100). Simulates back-to-back PRs with no idle time.

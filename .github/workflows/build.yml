@@ -11,7 +11,7 @@ on:
       count:
         description: Number of apps to build in this run
         required: false
-        default: "1"
+        default: "100"
 
 jobs:
   build:
@@ -35,7 +35,7 @@ jobs:
       - name: Generate app(s)
         run: |
           SEED="${{ inputs.seed || github.run_number }}"
-          COUNT="${{ inputs.count || '1' }}"
+          COUNT="${{ inputs.count || '100' }}"
           echo "seed=$SEED count=$COUNT"
           go run ./tools/gen -n "$COUNT" -seed "$SEED" -out apps
 
