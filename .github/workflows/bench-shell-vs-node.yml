@@ -1,0 +1,33 @@
+name: bench-shell-vs-node
+
+on:
+  workflow_dispatch:
+    inputs:
+      copy_budget_gb:
+        description: Max GiB to copy for destructive benches
+        required: false
+        default: "8"
+
+jobs:
+  bench:
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-go-cache
+          path: /mnt/go-cache
+          commit: "false"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Run shell-vs-node benchmarks
+        env:
+          GOCACHE_DIR: /mnt/go-cache/build
+          GOMODCACHE_DIR: /mnt/go-cache/mod
+          WORK_DIR: /mnt/go-cache/bench-work
+          COPY_BUDGET_GB: ${{ inputs.copy_budget_gb }}
+        run: node bench/shell-vs-node.mjs
