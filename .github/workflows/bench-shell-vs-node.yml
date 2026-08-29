@@ -16,7 +16,14 @@ on:
 
 jobs:
   bench:
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    strategy:
+      # All jobs mount the same sticky disk; run one at a time.
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        vcpu: [2, 4, 8]
+    name: bench-${{ matrix.vcpu }}vcpu
+    runs-on: blacksmith-${{ matrix.vcpu }}vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
 
@@ -36,5 +43,5 @@ jobs:
           GOMODCACHE_DIR: /mnt/go-cache/mod
           WORK_DIR: /mnt/go-cache/bench-work
           COPY_BUDGET_GB: ${{ inputs.copy_budget_gb || '8' }}
-          PHASES: ${{ inputs.phases || 'trim' }}
+          PHASES: ${{ inputs.phases || 'all' }}
         run: node bench/shell-vs-node.mjs
