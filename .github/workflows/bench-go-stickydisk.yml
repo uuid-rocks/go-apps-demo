@@ -1,0 +1,123 @@
+name: bench-go-stickydisk
+
+on:
+  push:
+    branches: [bench/go-stickydisk]
+
+concurrency:
+  group: bench-go-stickydisk
+  cancel-in-progress: false
+
+jobs:
+  uncached:
+    name: uncached-${{ matrix.project.name }}-${{ matrix.vcpu }}vcpu
+    runs-on: blacksmith-${{ matrix.vcpu }}vcpu-ubuntu-2404
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        vcpu: [2, 4, 8]
+        project:
+          - name: kubernetes
+            repo: kubernetes/kubernetes
+            sha: f54c212e3a2f75d674b717a9b29052b20b60aefc
+            churn: pkg/kubelet/kubelet.go
+            target: ./cmd/...
+          - name: hugo
+            repo: gohugoio/hugo
+            sha: 76a5e1880ab46688155b02e99bab9be2a6134492
+            churn: hugolib/site.go
+            target: ./...
+          - name: caddy
+            repo: caddyserver/caddy
+            sha: e2eee6a7fce366321294c9c2a79f3146891dcbdf
+            churn: modules/caddyhttp/server.go
+            target: ./...
+          - name: tailscale
+            repo: tailscale/tailscale
+            sha: 53a0d659afa51835dd7a9283873cca44261454f8
+            churn: ipn/ipnlocal/local.go
+            target: ./...
+          - name: minio
+            repo: minio/minio
+            sha: 9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
+            churn: cmd/server-main.go
+            target: ./...
+    steps:
+      - name: Clone
+        run: |
+          mkdir src && cd src
+          git init -q
+          git remote add origin https://github.com/${{ matrix.project.repo }}.git
+          git fetch -q --depth 1 origin ${{ matrix.project.sha }}
+          git checkout -q FETCH_HEAD
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache: false
+      - name: Churn one file
+        run: printf '\n// bench churn %s\n' "${{ github.run_id }}" >> "src/${{ matrix.project.churn }}"
+      - name: Build
+        working-directory: src
+        run: go build ${{ matrix.project.target }}
+      - name: Cache sizes
+        if: always()
+        run: du -sh "$(go env GOCACHE)" "$(go env GOMODCACHE)" 2>/dev/null || true
+
+  cached:
+    name: cached-${{ matrix.project.name }}-${{ matrix.vcpu }}vcpu
+    runs-on: blacksmith-${{ matrix.vcpu }}vcpu-ubuntu-2404
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        vcpu: [2, 4, 8]
+        project:
+          - name: kubernetes
+            repo: kubernetes/kubernetes
+            sha: f54c212e3a2f75d674b717a9b29052b20b60aefc
+            churn: pkg/kubelet/kubelet.go
+            target: ./cmd/...
+          - name: hugo
+            repo: gohugoio/hugo
+            sha: 76a5e1880ab46688155b02e99bab9be2a6134492
+            churn: hugolib/site.go
+            target: ./...
+          - name: caddy
+            repo: caddyserver/caddy
+            sha: e2eee6a7fce366321294c9c2a79f3146891dcbdf
+            churn: modules/caddyhttp/server.go
+            target: ./...
+          - name: tailscale
+            repo: tailscale/tailscale
+            sha: 53a0d659afa51835dd7a9283873cca44261454f8
+            churn: ipn/ipnlocal/local.go
+            target: ./...
+          - name: minio
+            repo: minio/minio
+            sha: 9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
+            churn: cmd/server-main.go
+            target: ./...
+    steps:
+      - uses: useblacksmith/stickydisk/go@591683c84d67b0c1e7ddc6b3abf30b7736ab6d4f
+        with:
+          key: go-bench-${{ matrix.project.name }}-${{ matrix.vcpu }}vcpu
+      - name: Clone
+        run: |
+          mkdir src && cd src
+          git init -q
+          git remote add origin https://github.com/${{ matrix.project.repo }}.git
+          git fetch -q --depth 1 origin ${{ matrix.project.sha }}
+          git checkout -q FETCH_HEAD
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache: false
+      - name: Churn one file
+        run: printf '\n// bench churn %s\n' "${{ github.run_id }}" >> "src/${{ matrix.project.churn }}"
+      - name: Build
+        working-directory: src
+        run: go build ${{ matrix.project.target }}
+      - name: Cache sizes
+        if: always()
+        run: du -sh "$(go env GOCACHE)" "$(go env GOMODCACHE)" 2>/dev/null || true
