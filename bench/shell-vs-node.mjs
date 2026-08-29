@@ -149,6 +149,54 @@ const ops = {
     await fs.rm(dir, { recursive: true, force: true });
     return {};
   },
+
+  // End-to-end trim as the PR does it: three separate tree passes
+  // (find -delete, du, find|sort).
+  async trim_shell(dir) {
+    const { stdout: evictOut } = await execAsync(
+      `find ${q(dir)} -type f -mtime +${MAX_AGE_DAYS} -print -delete | wc -l`,
+      { maxBuffer: MAX_BUFFER },
+    );
+    const { stdout: duOut } = await execAsync(`du -sB1 ${q(dir)} | cut -f1`);
+    const { stdout: listOut } = await execAsync(
+      `find ${q(dir)} -type f -printf '%T@\\t%s\\t%p\\n' | sort -n`,
+      { maxBuffer: MAX_BUFFER },
+    );
+    let entries = 0;
+    for (const line of listOut.split("\n")) {
+      if (!line) continue;
+      const [, sizeStr, ...pathParts] = line.split("\t");
+      if (isNaN(parseInt(sizeStr, 10)) || !pathParts.join("\t")) continue;
+      entries++;
+    }
+    return {
+      deleted: parseInt(evictOut.trim(), 10),
+      bytes: parseInt(duOut.trim(), 10),
+      entries,
+    };
+  },
+
+  // Same work in a single walk: one stat pass yields the stale set, the
+  // surviving size, and the LRU ordering.
+  async trim_node(dir) {
+    const cutoff = Date.now() - (MAX_AGE_DAYS + 1) * 86400 * 1000;
+    const files = await listDirFiles(dir);
+    const stats = await mapPool(files, 64, (f) => fs.stat(f));
+    const stale = [];
+    const kept = [];
+    let bytes = 0;
+    for (let i = 0; i < files.length; i++) {
+      if (stats[i].mtimeMs < cutoff) {
+        stale.push(files[i]);
+      } else {
+        kept.push({ path: files[i], mtimeMs: stats[i].mtimeMs });
+        bytes += stats[i].blocks * 512;
+      }
+    }
+    await mapPool(stale, 64, (f) => fs.unlink(f));
+    kept.sort((a, b) => a.mtimeMs - b.mtimeMs);
+    return { deleted: stale.length, bytes, entries: kept.length };
+  },
 };
 
 // --- child op-runner mode ---
@@ -248,93 +296,124 @@ async function preAge(dir) {
   return aged.length;
 }
 
+const PHASES = process.env.PHASES || "all";
+const has = (p) => PHASES === "all" || PHASES.split(",").includes(p);
+
 console.log(
-  `# node ${process.version}, ${os.cpus().length} cpus, ${os.type()} ${os.release()}`,
+  `# node ${process.version}, ${os.cpus().length} cpus, ${os.type()} ${os.release()}, phases=${PHASES}`,
 );
 await describe("GOCACHE", GOCACHE_DIR);
 await describe("GOMODCACHE", GOMODCACHE_DIR);
+await fs.mkdir(WORK_DIR, { recursive: true });
+const tree = path.join(WORK_DIR, "tree");
 
 // Phase 1: non-destructive on the live caches.
-for (const [label, dir] of [
-  ["gocache", GOCACHE_DIR],
-  ["gomodcache", GOMODCACHE_DIR],
-]) {
-  for (const op of ["size", "list"]) {
-    const bench = `${op}_${label}`;
-    await timeShell(bench, `${op}_shell`, dir, { cold: true });
-    await timeNode(bench, `${op}_node`, dir, { cold: true, tp: 4 });
-    await timeNode(bench, `${op}_node`, dir, { cold: true, tp: 16 });
-    for (let i = 0; i < 2; i++) {
-      await timeShell(bench, `${op}_shell`, dir, { cold: false });
-      await timeNode(bench, `${op}_node`, dir, { cold: false, tp: 4 });
-      await timeNode(bench, `${op}_node`, dir, { cold: false, tp: 16 });
+if (has("nondestructive")) {
+  for (const [label, dir] of [
+    ["gocache", GOCACHE_DIR],
+    ["gomodcache", GOMODCACHE_DIR],
+  ]) {
+    for (const op of ["size", "list"]) {
+      const bench = `${op}_${label}`;
+      await timeShell(bench, `${op}_shell`, dir, { cold: true });
+      await timeNode(bench, `${op}_node`, dir, { cold: true, tp: 4 });
+      await timeNode(bench, `${op}_node`, dir, { cold: true, tp: 16 });
+      for (let i = 0; i < 2; i++) {
+        await timeShell(bench, `${op}_shell`, dir, { cold: false });
+        await timeNode(bench, `${op}_node`, dir, { cold: false, tp: 4 });
+        await timeNode(bench, `${op}_node`, dir, { cold: false, tp: 16 });
+      }
     }
   }
 }
 
 // Phase 2: destructive, on bounded copies of the live GOCACHE.
-await fs.mkdir(WORK_DIR, { recursive: true });
-const tree = path.join(WORK_DIR, "tree");
+if (has("destructive")) {
+  const copied = await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
+  console.log(`# destructive copy: ${(copied / 2 ** 30).toFixed(1)} GiB`);
 
-const copied = await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
-console.log(`# destructive copy: ${(copied / 2 ** 30).toFixed(1)} GiB`);
+  const aged = await preAge(tree);
+  console.log(`# pre-aged ${aged} files past ${MAX_AGE_DAYS} days`);
+  const evictShell = await timeShell("evict", "evict_shell", tree, {
+    cold: true,
+  });
 
-let aged = await preAge(tree);
-console.log(`# pre-aged ${aged} files past ${MAX_AGE_DAYS} days`);
-const evictShell = await timeShell("evict", "evict_shell", tree, {
-  cold: true,
-});
+  await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
+  await preAge(tree);
+  const evictNode = await timeNode("evict", "evict_node", tree, {
+    cold: true,
+    tp: 16,
+  });
+  if (evictShell.deleted !== evictNode.deleted) {
+    console.log(
+      `# WARNING: evict parity mismatch shell=${evictShell.deleted} node=${evictNode.deleted}`,
+    );
+  }
 
-await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
-await preAge(tree);
-const evictNode = await timeNode("evict", "evict_node", tree, {
-  cold: true,
-  tp: 16,
-});
-if (evictShell.deleted !== evictNode.deleted) {
-  console.log(
-    `# WARNING: evict parity mismatch shell=${evictShell.deleted} node=${evictNode.deleted}`,
-  );
+  // Bulk delete: oldest 40% by (mtime, path), same relative list on each copy.
+  await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
+  const files = await listDirFiles(tree);
+  const stats = await mapPool(files, 64, (f) => fs.stat(f));
+  const rel = files
+    .map((f, i) => ({ rel: path.relative(tree, f), mtimeMs: stats[i].mtimeMs }))
+    .sort((a, b) => a.mtimeMs - b.mtimeMs || (a.rel < b.rel ? -1 : 1))
+    .slice(0, Math.floor(files.length * 0.4))
+    .map((e) => e.rel);
+  console.log(`# bulk delete: ${rel.length} of ${files.length} files`);
+  const listFile = path.join(WORK_DIR, "trim-list");
+
+  await fs.writeFile(listFile, rel.map((r) => path.join(tree, r)).join("\n"));
+  await timeShell("delete", "delete_shell", listFile, { cold: true });
+
+  await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
+  await timeNode("delete", "delete_node", listFile, { cold: true, tp: 16 });
+
+  // Wipe of a build-cache-shaped tree (writable files).
+  await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
+  await timeShell("wipe_gocache", "wipe_shell", tree, { cold: true });
+  await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
+  await timeNode("wipe_gocache", "wipe_node", tree, {
+    cold: true,
+    tp: 16,
+    sudo: true,
+  });
+
+  // Wipe of a mod-cache-shaped tree (read-only files; both sides need root).
+  const modTree = path.join(WORK_DIR, "mod-tree");
+  await boundedCopy(GOMODCACHE_DIR, modTree, COPY_BUDGET_BYTES);
+  await timeShell("wipe_gomodcache", "wipe_shell", modTree, { cold: true });
+  await boundedCopy(GOMODCACHE_DIR, modTree, COPY_BUDGET_BYTES);
+  await timeNode("wipe_gomodcache", "wipe_node", modTree, {
+    cold: true,
+    tp: 16,
+    sudo: true,
+  });
 }
 
-// Bulk delete: oldest 40% by (mtime, path), same relative list on each copy.
-await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
-const files = await listDirFiles(tree);
-const stats = await mapPool(files, 64, (f) => fs.stat(f));
-const rel = files
-  .map((f, i) => ({ rel: path.relative(tree, f), mtimeMs: stats[i].mtimeMs }))
-  .sort((a, b) => a.mtimeMs - b.mtimeMs || (a.rel < b.rel ? -1 : 1))
-  .slice(0, Math.floor(files.length * 0.4))
-  .map((e) => e.rel);
-console.log(`# bulk delete: ${rel.length} of ${files.length} files`);
-const listFile = path.join(WORK_DIR, "trim-list");
-
-await fs.writeFile(listFile, rel.map((r) => path.join(tree, r)).join("\n"));
-await timeShell("delete", "delete_shell", listFile, { cold: true });
-
-await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
-await timeNode("delete", "delete_node", listFile, { cold: true, tp: 16 });
-
-// Wipe of a build-cache-shaped tree (writable files).
-await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
-await timeShell("wipe_gocache", "wipe_shell", tree, { cold: true });
-await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
-await timeNode("wipe_gocache", "wipe_node", tree, {
-  cold: true,
-  tp: 16,
-  sudo: true,
-});
-
-// Wipe of a mod-cache-shaped tree (read-only files; both sides need root).
-const modTree = path.join(WORK_DIR, "mod-tree");
-await boundedCopy(GOMODCACHE_DIR, modTree, COPY_BUDGET_BYTES);
-await timeShell("wipe_gomodcache", "wipe_shell", modTree, { cold: true });
-await boundedCopy(GOMODCACHE_DIR, modTree, COPY_BUDGET_BYTES);
-await timeNode("wipe_gomodcache", "wipe_node", modTree, {
-  cold: true,
-  tp: 16,
-  sudo: true,
-});
+// Phase 3: end-to-end trim scenario — the PR's three shell passes vs a
+// single-pass node walk, with a threadpool sweep.
+if (has("trim")) {
+  const runs = [
+    ["shell", () => timeShell("trim", "trim_shell", tree, { cold: true })],
+    ...[8, 16, 32, 64].map((tp) => [
+      `node-tp${tp}`,
+      () => timeNode("trim", "trim_node", tree, { cold: true, tp }),
+    ]),
+  ];
+  const outcomes = [];
+  for (const [, run] of runs) {
+    const copied = await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
+    if (outcomes.length === 0) {
+      console.log(`# trim copy: ${(copied / 2 ** 30).toFixed(1)} GiB`);
+    }
+    await preAge(tree);
+    outcomes.push(await run());
+  }
+  const counts = new Set(outcomes.map((o) => `${o.deleted}/${o.entries}`));
+  if (counts.size !== 1) {
+    console.log(`# WARNING: trim parity mismatch: ${[...counts].join(" ")}`);
+  }
+}
 
 await execAsync(`sudo rm -rf ${q(WORK_DIR)}`);
 

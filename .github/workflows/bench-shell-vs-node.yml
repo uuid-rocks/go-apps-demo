@@ -9,6 +9,10 @@ on:
         description: Max GiB to copy for destructive benches
         required: false
         default: "8"
+      phases:
+        description: Comma-separated phases (nondestructive, destructive, trim) or "all"
+        required: false
+        default: "all"
 
 jobs:
   bench:
@@ -32,4 +36,5 @@ jobs:
           GOMODCACHE_DIR: /mnt/go-cache/mod
           WORK_DIR: /mnt/go-cache/bench-work
           COPY_BUDGET_GB: ${{ inputs.copy_budget_gb || '8' }}
+          PHASES: ${{ inputs.phases || 'trim' }}
         run: node bench/shell-vs-node.mjs
