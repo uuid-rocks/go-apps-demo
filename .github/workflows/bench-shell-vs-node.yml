@@ -1,0 +1,47 @@
+name: bench-shell-vs-node
+
+on:
+  push:
+    branches: [bench/shell-vs-node]
+  workflow_dispatch:
+    inputs:
+      copy_budget_gb:
+        description: Max GiB to copy for destructive benches
+        required: false
+        default: "8"
+      phases:
+        description: Comma-separated phases (nondestructive, destructive, trim) or "all"
+        required: false
+        default: "all"
+
+jobs:
+  bench:
+    strategy:
+      # All jobs mount the same sticky disk; run one at a time.
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        vcpu: [2, 4, 8]
+    name: bench-${{ matrix.vcpu }}vcpu
+    runs-on: blacksmith-${{ matrix.vcpu }}vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-go-cache
+          path: /mnt/go-cache
+          commit: "false"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Run shell-vs-node benchmarks
+        env:
+          GOCACHE_DIR: /mnt/go-cache/build
+          GOMODCACHE_DIR: /mnt/go-cache/mod
+          WORK_DIR: /mnt/go-cache/bench-work
+          COPY_BUDGET_GB: ${{ inputs.copy_budget_gb || '8' }}
+          PHASES: ${{ inputs.phases || 'all' }}
+        run: node bench/shell-vs-node.mjs
