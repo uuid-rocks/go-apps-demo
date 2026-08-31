@@ -1,0 +1,50 @@
+name: smoke-stickydisk
+
+on:
+  push:
+    branches: [smoke/stickydisk-go-cache]
+  workflow_dispatch:
+
+jobs:
+  go-cache:
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: useblacksmith/stickydisk/go@devin/1787952410-go-caching-option
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Verify exported Go cache env
+        run: |
+          echo "GOCACHE=$GOCACHE"
+          echo "GOMODCACHE=$GOMODCACHE"
+          test "$GOCACHE" = /mnt/go-cache/go/build
+          test "$GOMODCACHE" = /mnt/go-cache/go/mod
+          test "$(go env GOCACHE)" = /mnt/go-cache/go/build
+          test "$(go env GOMODCACHE)" = /mnt/go-cache/go/mod
+          mount | grep /mnt/go-cache
+
+      - name: Generate and build apps
+        run: |
+          go run ./tools/gen -n 20 -seed 42 -out apps
+          ./scripts/build-all.sh
+
+  plain:
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    steps:
+      - uses: useblacksmith/stickydisk@devin/1787952410-go-caching-option
+        with:
+          key: ${{ github.repository }}-smoke-plain
+          path: /mnt/smoke
+
+      - name: Verify mount and persistence
+        run: |
+          mount | grep /mnt/smoke
+          touch /mnt/smoke/writable-check
+          echo "run=${{ github.run_id }} attempt=${{ github.run_attempt }}" >> /mnt/smoke/runs.log
+          echo "--- runs.log so far ---"
+          cat /mnt/smoke/runs.log
