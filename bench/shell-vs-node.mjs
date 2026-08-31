@@ -24,13 +24,16 @@ const MAX_BUFFER = 1 << 30;
 const q = (s) => `'${s.replaceAll("'", `'\\''`)}'`;
 const MAX_AGE_DAYS = 7;
 
+// In-flight op pool width used by the node ops; the conc phase sweeps it.
+const IO_CONC = parseInt(process.env.BENCH_IO_CONC || "64", 10);
+
 // --- shared walk helpers ---
 
 async function listDirFiles(root) {
   const files = [];
   const pending = [root];
   while (pending.length) {
-    const batch = pending.splice(0, 64);
+    const batch = pending.splice(0, IO_CONC);
     await Promise.all(
       batch.map(async (d) => {
         const entries = await fs.readdir(d, { withFileTypes: true });
@@ -70,7 +73,7 @@ const ops = {
 
   async size_node(dir) {
     const files = await listDirFiles(dir);
-    const stats = await mapPool(files, 64, (f) => fs.stat(f));
+    const stats = await mapPool(files, IO_CONC, (f) => fs.stat(f));
     let bytes = 0;
     for (const s of stats) bytes += s.blocks * 512;
     return { bytes, files: files.length };
@@ -94,7 +97,7 @@ const ops = {
 
   async list_node(dir) {
     const files = await listDirFiles(dir);
-    const stats = await mapPool(files, 64, (f) => fs.stat(f));
+    const stats = await mapPool(files, IO_CONC, (f) => fs.stat(f));
     const entries = files.map((f, i) => ({
       path: f,
       mtimeMs: stats[i].mtimeMs,
@@ -115,9 +118,9 @@ const ops = {
   async evict_node(dir) {
     const cutoff = Date.now() - (MAX_AGE_DAYS + 1) * 86400 * 1000;
     const files = await listDirFiles(dir);
-    const stats = await mapPool(files, 64, (f) => fs.stat(f));
+    const stats = await mapPool(files, IO_CONC, (f) => fs.stat(f));
     let deleted = 0;
-    await mapPool(files, 64, async (f, i) => {
+    await mapPool(files, IO_CONC, async (f, i) => {
       if (stats[i].mtimeMs < cutoff) {
         await fs.unlink(f);
         deleted++;
@@ -135,7 +138,7 @@ const ops = {
 
   async delete_node(listFile) {
     const files = (await fs.readFile(listFile, "utf8")).split("\n").filter(Boolean);
-    await mapPool(files, 64, (f) => fs.unlink(f));
+    await mapPool(files, IO_CONC, (f) => fs.unlink(f));
     return { deleted: files.length };
   },
 
@@ -181,7 +184,7 @@ const ops = {
   async trim_node(dir) {
     const cutoff = Date.now() - (MAX_AGE_DAYS + 1) * 86400 * 1000;
     const files = await listDirFiles(dir);
-    const stats = await mapPool(files, 64, (f) => fs.stat(f));
+    const stats = await mapPool(files, IO_CONC, (f) => fs.stat(f));
     const stale = [];
     const kept = [];
     let bytes = 0;
@@ -193,7 +196,7 @@ const ops = {
         bytes += stats[i].blocks * 512;
       }
     }
-    await mapPool(stale, 64, (f) => fs.unlink(f));
+    await mapPool(stale, IO_CONC, (f) => fs.unlink(f));
     kept.sort((a, b) => a.mtimeMs - b.mtimeMs);
     return { deleted: stale.length, bytes, entries: kept.length };
   },
@@ -244,17 +247,20 @@ async function timeShell(bench, opName, arg, { cold }) {
 
 // Node variants run in a child so UV_THREADPOOL_SIZE applies; the child
 // reports its own timing, excluding process startup.
-async function timeNode(bench, opName, arg, { cold, tp, sudo = false }) {
+async function timeNode(bench, opName, arg, { cold, tp, conc, sudo = false }) {
   if (cold) await dropCaches();
   const argv = [process.argv[1], "op", opName, arg];
   const cmd = sudo ? "sudo" : process.execPath;
   const args = sudo ? [process.execPath, ...argv] : argv;
+  const env = { ...process.env, UV_THREADPOOL_SIZE: String(tp) };
+  if (conc) env.BENCH_IO_CONC = String(conc);
   const { stdout } = await execFileAsync(cmd, args, {
     maxBuffer: MAX_BUFFER,
-    env: { ...process.env, UV_THREADPOOL_SIZE: String(tp) },
+    env,
   });
   const { ms, result } = JSON.parse(stdout);
-  record({ bench, variant: `node-tp${tp}`, cold, ms, result });
+  const variant = conc ? `node-tp${tp}-c${conc}` : `node-tp${tp}`;
+  record({ bench, variant, cold, ms, result });
   return result;
 }
 
@@ -292,7 +298,7 @@ async function preAge(dir) {
   const files = (await listDirFiles(dir)).sort();
   const old = new Date(Date.now() - 10 * 86400 * 1000);
   const aged = files.filter((_, i) => i % 3 === 0);
-  await mapPool(aged, 64, (f) => fs.utimes(f, old, old));
+  await mapPool(aged, IO_CONC, (f) => fs.utimes(f, old, old));
   return aged.length;
 }
 
@@ -353,7 +359,7 @@ if (has("destructive")) {
   // Bulk delete: oldest 40% by (mtime, path), same relative list on each copy.
   await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
   const files = await listDirFiles(tree);
-  const stats = await mapPool(files, 64, (f) => fs.stat(f));
+  const stats = await mapPool(files, IO_CONC, (f) => fs.stat(f));
   const rel = files
     .map((f, i) => ({ rel: path.relative(tree, f), mtimeMs: stats[i].mtimeMs }))
     .sort((a, b) => a.mtimeMs - b.mtimeMs || (a.rel < b.rel ? -1 : 1))
@@ -388,6 +394,57 @@ if (has("destructive")) {
     tp: 16,
     sudo: true,
   });
+}
+
+// Phase: IO_CONC sweep at fixed tp16 — how wide the in-flight op pool must
+// be relative to the threadpool. Cold walk+stat on both live caches, then an
+// unlink-pool sweep on identical copies.
+if (has("conc")) {
+  const CONCS = [8, 16, 32, 64, 128, 256];
+  for (const [label, dir] of [
+    ["gocache", GOCACHE_DIR],
+    ["gomodcache", GOMODCACHE_DIR],
+  ]) {
+    for (let iter = 0; iter < 2; iter++) {
+      await timeShell(`size_${label}_conc`, "size_shell", dir, { cold: true });
+      for (const conc of CONCS) {
+        await timeNode(`size_${label}_conc`, "size_node", dir, {
+          cold: true,
+          tp: 16,
+          conc,
+        });
+      }
+    }
+  }
+
+  let rel = null;
+  const listFile = path.join(WORK_DIR, "trim-list");
+  for (const conc of ["shell", 16, 64, 256]) {
+    await boundedCopy(GOCACHE_DIR, tree, COPY_BUDGET_BYTES);
+    if (!rel) {
+      const files = await listDirFiles(tree);
+      const stats = await mapPool(files, IO_CONC, (f) => fs.stat(f));
+      rel = files
+        .map((f, i) => ({
+          rel: path.relative(tree, f),
+          mtimeMs: stats[i].mtimeMs,
+        }))
+        .sort((a, b) => a.mtimeMs - b.mtimeMs || (a.rel < b.rel ? -1 : 1))
+        .slice(0, Math.floor(files.length * 0.4))
+        .map((e) => e.rel);
+      console.log(`# conc delete sweep: ${rel.length} of ${files.length} files`);
+    }
+    await fs.writeFile(listFile, rel.map((r) => path.join(tree, r)).join("\n"));
+    if (conc === "shell") {
+      await timeShell("delete_conc", "delete_shell", listFile, { cold: true });
+    } else {
+      await timeNode("delete_conc", "delete_node", listFile, {
+        cold: true,
+        tp: 16,
+        conc,
+      });
+    }
+  }
 }
 
 // Phase 3: end-to-end trim scenario — the PR's three shell passes vs a

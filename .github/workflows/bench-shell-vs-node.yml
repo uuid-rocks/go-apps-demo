@@ -43,5 +43,5 @@ jobs:
           GOMODCACHE_DIR: /mnt/go-cache/mod
           WORK_DIR: /mnt/go-cache/bench-work
           COPY_BUDGET_GB: ${{ inputs.copy_budget_gb || '8' }}
-          PHASES: ${{ inputs.phases || 'all' }}
+          PHASES: ${{ inputs.phases || 'conc' }}
         run: node bench/shell-vs-node.mjs
