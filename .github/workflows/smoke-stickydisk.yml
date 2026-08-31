@@ -48,3 +48,18 @@ jobs:
           echo "run=${{ github.run_id }} attempt=${{ github.run_attempt }}" >> /mnt/smoke/runs.log
           echo "--- runs.log so far ---"
           cat /mnt/smoke/runs.log
+
+  plain-v1:
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    steps:
+      - uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-smoke-plain-v1
+          path: /mnt/smoke
+
+      - name: Verify mount and persistence
+        run: |
+          mount | grep /mnt/smoke
+          echo "run=${{ github.run_id }} attempt=${{ github.run_attempt }}" >> /mnt/smoke/runs.log
+          echo "--- runs.log so far ---"
+          cat /mnt/smoke/runs.log
