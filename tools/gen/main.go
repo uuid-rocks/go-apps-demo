@@ -86,7 +86,7 @@ var depPool = []dep{
 }
 
 func main() {
-	n := flag.Int("n", 100, "number of apps to generate")
+	n := flag.Int("n", 100, "number of apps to generate (each is its own module)")
 	seed := flag.Int64("seed", 1, "random seed (change to simulate a new round of PRs)")
 	out := flag.String("out", "apps", "output directory")
 	tidy := flag.Bool("tidy", true, "run 'go mod tidy' in each generated app (needs network)")

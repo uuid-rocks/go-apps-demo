@@ -6,7 +6,7 @@ seed := "1"
 default:
     @just --list
 
-# Generate N apps under apps/ (runs go mod tidy in each)
+# Generate N apps under apps/ (runs go mod tidy in each). Default n=10.
 gen n=n seed=seed:
     go run ./tools/gen -n {{n}} -seed {{seed}} -out apps
 
