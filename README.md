@@ -3,6 +3,8 @@
 Load test for [Blacksmith Sticky Disk](https://docs.blacksmith.sh/) cache churn:
 simulates many developers opening PRs against many Go services.
 
+This is a harness smoke-test edit for the diff viewer.
+
 - `tools/gen` — generates N self-contained Go app modules (`apps/app-NNN`). Each app
   picks 5–12 deps from a pool of ~45 real modules (each with several pinned versions,
   including heavy ones like aws-sdk-go, client-go, GCS, docker, terraform-plugin-sdk)
