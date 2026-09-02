@@ -2,6 +2,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 n := "10"
 seed := "1"
+# Diff-viewer harness: extra comment only
 
 default:
     @just --list
