@@ -1,6 +1,8 @@
 # go-apps-demo
 
 Load test for [Blacksmith Sticky Disk](https://docs.blacksmith.sh/) cache churn:
+Harness note: this README change exists only to exercise the diff viewer.
+
 simulates many developers opening PRs against many Go services.
 
 - `tools/gen` — generates N self-contained Go app modules (`apps/app-NNN`). Each app

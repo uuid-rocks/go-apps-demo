@@ -1,2 +1,6 @@
 # Generated apps (regenerate with: go run ./tools/gen)
 /apps/
+
+# Local scratch
+*.tmp
+.DS_Store

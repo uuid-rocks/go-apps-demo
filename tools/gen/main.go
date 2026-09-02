@@ -1,5 +1,6 @@
 // Command gen generates N synthetic Go application modules under an output
-// directory. Every app is its own Go module with a seeded-random mix of
+// directory. Diff-viewer harness: comment-only change.
+// Every app is its own Go module with a seeded-random mix of
 // third-party dependencies and a handful of internal packages whose source
 // changes with the seed. This is meant to simulate many developers opening
 // PRs against many Go services, so that build/module caches see realistic churn.
