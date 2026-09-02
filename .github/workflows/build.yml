@@ -39,6 +39,7 @@ jobs:
           echo "seed=$SEED count=$COUNT"
           go run ./tools/gen -n "$COUNT" -seed "$SEED" -out apps
 
+      # Harness round 2: comment-only change.
       - name: Build
         run: ./scripts/build-all.sh
 
