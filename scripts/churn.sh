@@ -6,6 +6,7 @@
 #   ./scripts/churn.sh [count]
 set -euo pipefail
 
+# Harness round 2: comment-only change.
 COUNT="${1:-${COUNT:-100}}"
 DELAY="${DELAY:-10}" # seconds to wait after a run finishes before pushing the next
 BRANCH="${BRANCH:-main}"

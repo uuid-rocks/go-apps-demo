@@ -6,6 +6,7 @@ set -euo pipefail
 
 APPS_DIR="${APPS_DIR:-apps}"
 PARALLEL="${PARALLEL:-2}"
+# Harness round 2: comment-only change, no behavior difference.
 GOCACHE_DIR="$(go env GOCACHE)"
 GOMODCACHE_DIR="$(go env GOMODCACHE)"
 
