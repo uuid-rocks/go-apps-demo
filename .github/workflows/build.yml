@@ -40,6 +40,7 @@ jobs:
           go run ./tools/gen -n "$COUNT" -seed "$SEED" -out apps
 
       - name: Build
+        # Builds, vets, and tests every generated app; see scripts/build-all.sh.
         run: ./scripts/build-all.sh
 
       - name: Clean go caches if oversized

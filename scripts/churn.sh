@@ -11,7 +11,7 @@ DELAY="${DELAY:-10}" # seconds to wait after a run finishes before pushing the n
 BRANCH="${BRANCH:-main}"
 WORKFLOW="${WORKFLOW:-build.yml}"
 
-find_run() { # prints run id for a commit sha, or nothing
+find_run() { # prints the run id for a commit sha, or nothing if no run exists yet
   gh run list --workflow "$WORKFLOW" --commit "$1" --limit 1 --json databaseId -q '.[0].databaseId'
 }
 
