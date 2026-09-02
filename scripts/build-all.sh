@@ -4,6 +4,7 @@
 # CI with GOCACHE and GOMODCACHE pointed at a persistent (sticky) disk.
 set -euo pipefail
 
+# Override APPS_DIR/PARALLEL from the environment to change scope or concurrency.
 APPS_DIR="${APPS_DIR:-apps}"
 PARALLEL="${PARALLEL:-2}"
 GOCACHE_DIR="$(go env GOCACHE)"
