@@ -1,3 +1,4 @@
+# harness: diff-viewer test marker
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 n := "10"

@@ -1,4 +1,5 @@
 name: build
+# harness: diff-viewer test marker
 
 on:
   push:

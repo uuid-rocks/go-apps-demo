@@ -7,7 +7,7 @@
 // Usage:
 //
 //	go run ./tools/gen -n 100 -seed 42 -out apps [-tidy=false]
-package main
+package main // harness: diff-viewer test marker
 
 import (
 	"flag"

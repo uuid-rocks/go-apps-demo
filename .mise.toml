@@ -1,3 +1,4 @@
+# harness: diff-viewer test marker
 [tools]
 go = "1.24.13"
 just = "latest"
