@@ -1,2 +1,3 @@
 # Generated apps (regenerate with: go run ./tools/gen)
+# harness: diff-viewer test marker
 /apps/
