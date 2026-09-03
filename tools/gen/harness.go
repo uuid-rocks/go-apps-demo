@@ -22,7 +22,7 @@ func harnessSummary(counts map[string]int) string {
 		parts = append(parts, fmt.Sprintf("%s=%d", k, counts[k]))
 	}
 	if len(parts) == 0 {
-		return "empty"
+		return "empty" // round four
 	}
 	return strings.Join(parts, " ")
 }

@@ -1,3 +1,4 @@
 harness test: CRLF fixture
 second line
 third line
+extra: 🧱 round four

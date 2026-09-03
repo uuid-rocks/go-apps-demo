@@ -26,4 +26,4 @@ for script in scripts/*.sh scripts/harness/*.sh; do
   bash -n "$script" || fail "syntax error in $script"
 done
 
-echo "harness check ok"
+echo "harness check ok (round four)"
