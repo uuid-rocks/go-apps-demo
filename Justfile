@@ -1,3 +1,4 @@
+# Harness test: dummy Justfile tweak for the diff viewer.
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 n := "10"

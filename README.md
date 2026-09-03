@@ -1,5 +1,7 @@
 # go-apps-demo
 
+Harness test: dummy README tweak for the diff viewer.
+
 Load test for [Blacksmith Sticky Disk](https://docs.blacksmith.sh/) cache churn:
 simulates many developers opening PRs against many Go services.
 

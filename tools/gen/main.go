@@ -1,3 +1,4 @@
+// Harness test: dummy main.go tweak for the diff viewer.
 // Command gen generates N synthetic Go application modules under an output
 // directory. Every app is its own Go module with a seeded-random mix of
 // third-party dependencies and a handful of internal packages whose source
