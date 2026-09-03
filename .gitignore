@@ -1,2 +1,3 @@
+# Harness test PR: dummy gitignore note.
 # Generated apps (regenerate with: go run ./tools/gen)
 /apps/
