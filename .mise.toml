@@ -1,3 +1,4 @@
+# Harness test PR: dummy mise note.
 [tools]
 go = "1.24.13"
 just = "latest"

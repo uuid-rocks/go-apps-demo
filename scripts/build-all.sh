@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Harness test PR: dummy build-all note.
 # Builds every generated app, PARALLEL apps at a time (default: 2),
 # printing per-app timing and Go cache sizes before/after. Intended to run on
 # CI with GOCACHE and GOMODCACHE pointed at a persistent (sticky) disk.

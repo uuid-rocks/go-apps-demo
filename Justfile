@@ -1,3 +1,4 @@
+# Harness test PR: dummy Justfile note.
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 n := "10"
