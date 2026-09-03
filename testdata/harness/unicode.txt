@@ -1,0 +1,7 @@
+harness unicode fixture
+emoji: 🔨 🧪 ✅ 🚀 🧵
+cjk: 鍛冶屋のテスト / 差分ビューア
+rtl: مرحبا بالعالم
+combining: é vs é, ﬁ ligature, zero-width joiner: 👩‍💻
+box: ┌─┬─┐ │ ├─┼─┤ └─┴─┘
+harness: round four appended line

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Harness test: dummy build-all.sh tweak for the diff viewer.
 # Builds every generated app, PARALLEL apps at a time (default: 2),
 # printing per-app timing and Go cache sizes before/after. Intended to run on
 # CI with GOCACHE and GOMODCACHE pointed at a persistent (sticky) disk.
@@ -10,6 +11,12 @@ GOCACHE_DIR="$(go env GOCACHE)"
 GOMODCACHE_DIR="$(go env GOMODCACHE)"
 
 du_h() { [ -d "$1" ] && du -sh "$1" 2>/dev/null | cut -f1 || echo "0"; }
+
+# Harness test: make the app count visible up front so run logs are easier to
+# skim when comparing two churn rounds against each other.
+app_count() { find "$APPS_DIR" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l | tr -d ' '; }
+
+echo "APPS_DIR=$APPS_DIR ($(app_count) apps, PARALLEL=$PARALLEL)"
 
 echo "GOCACHE=$GOCACHE_DIR ($(du_h "$GOCACHE_DIR"))"
 echo "GOMODCACHE=$GOMODCACHE_DIR ($(du_h "$GOMODCACHE_DIR"))"

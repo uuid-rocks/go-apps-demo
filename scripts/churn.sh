@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Harness test: dummy churn.sh tweak for the diff viewer.
 # Pushes a commit to main, waits for its workflow run to finish (via gh), waits
 # DELAY seconds, then pushes the next one — COUNT times. Simulates back-to-back PRs
 # with no idle time between builds. Ctrl-C to stop early.

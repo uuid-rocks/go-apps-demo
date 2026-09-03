@@ -1,3 +1,4 @@
+// Harness test: dummy main.go tweak for the diff viewer.
 // Command gen generates N synthetic Go application modules under an output
 // directory. Every app is its own Go module with a seeded-random mix of
 // third-party dependencies and a handful of internal packages whose source
@@ -22,6 +23,8 @@ import (
 	"sync"
 )
 
+// dep is one entry in the module pool. Two deps may share an import path only
+// if they use distinct aliases, otherwise the generated app will not compile.
 type dep struct {
 	path     string
 	versions []string // one is picked per app, so different seeds pull different versions
@@ -73,6 +76,8 @@ var depPool = []dep{
 	{"github.com/mitchellh/mapstructure", []string{"v1.5.0"}, "github.com/mitchellh/mapstructure", "", `_ = mapstructure.Decode`},
 	{"github.com/json-iterator/go", []string{"v1.1.12"}, "github.com/json-iterator/go", "", `_ = jsoniter.ConfigFastest`},
 	{"github.com/klauspost/compress", []string{"v1.17.4", "v1.17.9", "v1.17.11"}, "github.com/klauspost/compress/zstd", "", `_, _ = zstd.NewWriter(nil)`},
+	{"github.com/dustin/go-humanize", []string{"v1.0.0", "v1.0.1"}, "github.com/dustin/go-humanize", "humanize", `_ = humanize.Bytes(1024)`},
+	{"github.com/fatih/color", []string{"v1.15.0", "v1.16.0", "v1.18.0"}, "github.com/fatih/color", "", `_ = color.New(color.FgCyan)`},
 	// Heavy: huge module downloads and/or large compile trees.
 	{"github.com/aws/aws-sdk-go", []string{"v1.48.0", "v1.50.0", "v1.55.5"}, "github.com/aws/aws-sdk-go/aws", "awsv1", `_ = awsv1.String("x")`},
 	{"github.com/aws/aws-sdk-go-v2", []string{"v1.24.0", "v1.27.0", "v1.30.0", "v1.32.6"}, "github.com/aws/aws-sdk-go-v2/aws", "", `_ = aws.String("x")`},

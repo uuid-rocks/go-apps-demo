@@ -1,2 +1,6 @@
+# Harness test: dummy gitignore tweak for the diff viewer.
 # Generated apps (regenerate with: go run ./tools/gen)
 /apps/
+
+# Churn marker, rewritten by scripts/churn.sh on every push
+/.churn

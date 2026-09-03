@@ -1,5 +1,9 @@
 # go-apps-demo
 
+Harness test: dummy README tweak for the diff viewer. See `docs/harness-notes.md`
+for what the harness branch covers. Nothing on this branch changes how the
+generator, the build scripts, or CI behave.
+
 Load test for [Blacksmith Sticky Disk](https://docs.blacksmith.sh/) cache churn:
 simulates many developers opening PRs against many Go services.
 

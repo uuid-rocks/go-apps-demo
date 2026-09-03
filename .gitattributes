@@ -1,0 +1,6 @@
+# Keep the diff-viewer fixtures byte-exact: no eol normalization, and treat the
+# pixel as binary so git does not try to diff it as text.
+testdata/harness/crlf.txt -text
+testdata/harness/no-trailing-newline.txt -text
+testdata/harness/pixel.png binary
+testdata/harness/bigtable.go linguist-generated=true

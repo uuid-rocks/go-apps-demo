@@ -1,3 +1,4 @@
+# Harness test: dummy actionlint tweak for the diff viewer.
 self-hosted-runner:
   labels:
     - blacksmith-*
