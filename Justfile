@@ -28,7 +28,7 @@ clean:
 
 # Lint the generator itself
 check:
-    gofmt -l tools && go vet ./tools/...
+    ./scripts/harness-check.sh
 
 # Generate a single app by index (what each CI matrix job does)
 gen-one index n=n seed=seed:
