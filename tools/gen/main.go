@@ -96,6 +96,9 @@ func main() {
 	only := flag.Int("only", -1, "generate only app with this index (0-based); output is identical to a full run")
 	jobs := flag.Int("j", runtime.NumCPU(), "parallel 'go mod tidy' workers")
 	flag.Parse()
+	if *n < 1 {
+		log.Fatal("-n must be >= 1")
+	}
 
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		log.Fatal(err)

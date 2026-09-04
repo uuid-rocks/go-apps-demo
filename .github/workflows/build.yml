@@ -36,7 +36,7 @@ jobs:
         run: |
           SEED="${{ inputs.seed || github.run_number }}"
           COUNT="${{ inputs.count || '100' }}"
-          echo "seed=$SEED count=$COUNT"
+          echo "seed=$SEED count=$COUNT jobs=$(nproc)"
           go run ./tools/gen -n "$COUNT" -seed "$SEED" -out apps
 
       - name: Build

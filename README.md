@@ -23,6 +23,7 @@ Local:
 ```sh
 mise install
 just gen 10 1   # generate 10 apps with seed 1
-just build      # build them all in series
+just build      # build them all (PARALLEL=2 by default)
 just all 100 42 # or both at once
+just check      # lint the generator
 ```

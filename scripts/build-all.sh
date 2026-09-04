@@ -13,6 +13,7 @@ du_h() { [ -d "$1" ] && du -sh "$1" 2>/dev/null | cut -f1 || echo "0"; }
 
 echo "GOCACHE=$GOCACHE_DIR ($(du_h "$GOCACHE_DIR"))"
 echo "GOMODCACHE=$GOMODCACHE_DIR ($(du_h "$GOMODCACHE_DIR"))"
+echo "PARALLEL=$PARALLEL"
 echo "building $(ls -d "$APPS_DIR"/*/ | wc -l | tr -d ' ') apps, $PARALLEL at a time"
 echo
 
