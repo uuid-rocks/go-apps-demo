@@ -8,6 +8,7 @@ set -euo pipefail
 
 COUNT="${1:-${COUNT:-100}}"
 DELAY="${DELAY:-10}" # seconds to wait after a run finishes before pushing the next
+# Override BRANCH/WORKFLOW when replaying against a fork or a different workflow.
 BRANCH="${BRANCH:-main}"
 WORKFLOW="${WORKFLOW:-build.yml}"
 

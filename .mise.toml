@@ -1,3 +1,4 @@
+# Tool versions for local mise installs.
 [tools]
 go = "1.24.13"
 just = "latest"

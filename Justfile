@@ -2,6 +2,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 n := "10"
 seed := "1"
+# Defaults match a small local run; CI passes its own n/seed.
 
 default:
     @just --list
