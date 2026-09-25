@@ -36,3 +36,5 @@ gen-one index n=n seed=seed:
 # Push `count` commits back-to-back, waiting for each CI run to finish first
 churn count="100":
     ./scripts/churn.sh {{count}}
+
+# [code]smith test PR: DO NOT MERGE

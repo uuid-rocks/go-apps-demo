@@ -1,2 +1,4 @@
 # Generated apps (regenerate with: go run ./tools/gen)
 /apps/
+
+# [code]smith test PR: DO NOT MERGE

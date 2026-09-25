@@ -26,3 +26,5 @@ just gen 10 1   # generate 10 apps with seed 1
 just build      # build them all in series
 just all 100 42 # or both at once
 ```
+
+<!-- [code]smith test PR: DO NOT MERGE -->
