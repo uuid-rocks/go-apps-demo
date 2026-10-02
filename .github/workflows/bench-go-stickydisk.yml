@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [uncached, stickydisk, gocacheprog]
+        variant: [uncached, stickydisk, gocacheprog, gocacheprog-modcache]
         vcpu: [2, 4, 8]
         project:
           - name: kubernetes
@@ -46,12 +46,19 @@ jobs:
             target: ./...
     steps:
       - name: Disable GOCACHEPROG
-        if: matrix.variant != 'gocacheprog'
+        if: ${{ !startsWith(matrix.variant, 'gocacheprog') }}
         run: echo "GOCACHEPROG=" >> "$GITHUB_ENV"
       - if: matrix.variant == 'stickydisk'
         uses: useblacksmith/stickydisk/go@591683c84d67b0c1e7ddc6b3abf30b7736ab6d4f
         with:
           key: go-bench-${{ matrix.project.name }}-${{ matrix.vcpu }}vcpu
+      - if: matrix.variant == 'gocacheprog-modcache'
+        uses: useblacksmith/stickydisk@591683c84d67b0c1e7ddc6b3abf30b7736ab6d4f
+        with:
+          key: go-bench-modcache-${{ matrix.project.name }}-${{ matrix.vcpu }}vcpu
+          path: /mnt/go-modcache
+      - if: matrix.variant == 'gocacheprog-modcache'
+        run: echo "GOMODCACHE=/mnt/go-modcache" >> "$GITHUB_ENV"
       - name: Clone
         run: |
           mkdir src && cd src
@@ -68,11 +75,11 @@ jobs:
         run: |
           prog="$(go env GOCACHEPROG)"
           echo "GOCACHEPROG=${prog}"
-          if [ "${{ matrix.variant }}" = gocacheprog ]; then test -n "$prog"; else test -z "$prog"; fi
-      # The vcpu suffix keeps concurrent gocacheprog jobs from reusing each
-      # other's churned outputs through the shared remote cache.
+          case "${{ matrix.variant }}" in gocacheprog*) test -n "$prog" ;; *) test -z "$prog" ;; esac
+      # The vcpu and variant suffix keeps concurrent gocacheprog jobs from
+      # reusing each other's churned outputs through the shared remote cache.
       - name: Churn one file
-        run: printf '\n// bench churn %s-%s\n' "${{ github.run_id }}" "${{ matrix.vcpu }}" >> "src/${{ matrix.project.churn }}"
+        run: printf '\n// bench churn %s-%s-%s\n' "${{ github.run_id }}" "${{ matrix.vcpu }}" "${{ matrix.variant }}" >> "src/${{ matrix.project.churn }}"
       - name: Build
         working-directory: src
         run: go build ${{ matrix.project.target }}
