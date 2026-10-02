@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [uncached, stickydisk, gocacheprog, gocacheprog-modcache]
+        variant: [uncached, stickydisk, gocacheprog, gocacheprog-modcache, setup-go-cache]
         vcpu: [2, 4, 8]
         project:
           - name: kubernetes
@@ -69,7 +69,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: src/go.mod
-          cache: false
+          cache: ${{ matrix.variant == 'setup-go-cache' }}
+          cache-dependency-path: src/go.sum
       - name: Check GOCACHEPROG
         working-directory: src
         run: |
